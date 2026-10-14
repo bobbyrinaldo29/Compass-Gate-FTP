@@ -1,10 +1,10 @@
 # Rules
 
-Style menggunakan default dari Xcode:
-- Indentasi 4 spasi (Xcode default).
-- Naming: PascalCase untuk tipe/struct/class, camelCase untuk variabel/fungsi.
-- Typography / UI: Gunakan font sesuai dengan ukuran dan tipe bawaan dari Mac (macOS native Dynamic Type & SF Pro / SF Mono bawaan sistem, seperti .largeTitle, .title, .headline, .body, .subheadline, .caption).
-- Toolbar & Sidebar: Gunakan komponen native macOS (ToolbarItem, ToolbarItemGroup, .pickerStyle(.segmented), .searchable) dan JANGAN UBAH struktur desain toolbar & sidebar yang sudah disetujui.
-- SwiftUI: `@State private var` untuk state lokal, hindari force unwrapping (`!`).
-- Concurrency: Gunakan async/await modern Swift.
-- Unit Testing: Gunakan Swift Testing framework.
+Follow Xcode default code styling:
+- Indentation: 4 spaces (Xcode default).
+- Naming Conventions: PascalCase for types/structs/classes, camelCase for variables/functions.
+- Typography / UI: Use native macOS system fonts and sizing (macOS Dynamic Type & system SF Pro / SF Mono, such as `.largeTitle`, `.title`, `.headline`, `.body`, `.subheadline`, `.caption`).
+- Toolbar & Sidebar: Use native macOS components (`ToolbarItem`, `ToolbarItemGroup`, `.pickerStyle(.segmented)`, `.searchable`) and DO NOT ALTER the approved toolbar & sidebar design structure.
+- SwiftUI: Use `@State private var` for local view state; avoid force unwrapping (`!`).
+- Concurrency: Use modern Swift `async`/`await`.
+- Unit Testing: Use the Swift Testing framework (`import Testing`).
