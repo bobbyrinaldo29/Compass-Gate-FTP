@@ -16,6 +16,8 @@ struct RemoteFileBrowserView: View {
     var localManager: LocalFileManager? = nil
     var isActive: Bool = true
     var onActivate: (() -> Void)? = nil
+    var onPromptPassword: ((SSHConnection) -> Void)? = nil
+    var onEditConnection: ((SSHConnection) -> Void)? = nil
 
     private var groupSections: [FileGroupSection] {
         groupFiles(filteredFiles, by: groupBy)
@@ -333,20 +335,53 @@ struct RemoteFileBrowserView: View {
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if case .error(let msg) = sftpService.state {
+                let isPasswordRequired = connection.authType == .password && (connection.password.isEmpty || msg.lowercased().contains("password"))
+                ContentUnavailableView {
+                    Label(
+                        isPasswordRequired ? "Password Required" : "Connection Failed",
+                        systemImage: isPasswordRequired ? "lock.shield" : "exclamationmark.triangle"
+                    )
+                } description: {
+                    Text(msg)
+                } actions: {
+                    HStack(spacing: 12) {
+                        if isPasswordRequired || connection.authType == .password {
+                            Button("Enter Password") {
+                                onPromptPassword?(connection)
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                        Button("Retry") {
+                            sftpService.retryConnection()
+                        }
+                        .buttonStyle(.bordered)
+
+                        Button("Edit Connection") {
+                            onEditConnection?(connection)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if filteredFiles.isEmpty {
                 ContentUnavailableView {
                     Label("Folder is Empty", systemImage: "folder")
                 } description: {
                     Text("No files or directories found in \(sftpService.currentPath)")
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 switch viewMode {
                 case .list:
                     listView
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 case .icons:
                     iconsView
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 case .columns:
                     columnsView
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
 
@@ -637,6 +672,7 @@ struct RemoteFileBrowserView: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder

@@ -373,4 +373,35 @@ Filesystem      Size  Used Avail Use% Mounted on
         #expect(resRefused.title == "Connection Refused")
         #expect(resRefused.message.contains("port number"))
     }
+
+    @Test func testEmptyPasswordValidationAndSessionPassword() async {
+        let service = SFTPService()
+        let connWithoutPass = SSHConnection(
+            name: "Server Without Pass",
+            host: "192.168.1.100",
+            port: 22,
+            username: "root",
+            password: "",
+            authType: .password
+        )
+
+        // Attempting to connect without password must set error state
+        await service.connect(to: connWithoutPass)
+        if case .error(let msg) = service.state {
+            #expect(msg.contains("Password is required"))
+            #expect(service.showErrorAlert == true)
+        } else {
+            Issue.record("Expected state to be .error when password is missing")
+        }
+
+        // Connecting with sessionPassword sets currentSessionPassword
+        await service.connect(to: connWithoutPass, sessionPassword: "TempPassword123!")
+        #expect(service.currentSessionPassword == "TempPassword123!")
+
+        // Disconnecting must clear session password
+        service.disconnect()
+        #expect(service.currentSessionPassword == nil)
+        #expect(service.state == .disconnected)
+    }
 }
+

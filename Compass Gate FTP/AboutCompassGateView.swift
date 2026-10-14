@@ -6,18 +6,27 @@
 import SwiftUI
 
 struct AboutCompassGateView: View {
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
+    }
+
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+    }
+
     var body: some View {
         VStack(spacing: 20) {
-            Image(systemName: "safari.fill")
-                .font(.largeTitle)
-                .foregroundStyle(.tint)
+            Image(nsImage: NSApplication.shared.applicationIconImage)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 80, height: 80)
 
             VStack(spacing: 6) {
                 Text("Compass Gate FTP")
                     .font(.title2)
                     .bold()
 
-                Text("Version 1.0 (Build 1)")
+                Text("Version \(appVersion) (Build \(buildNumber))")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

@@ -58,6 +58,8 @@ struct ContentView: View {
     @State private var sftpService = SFTPService()
     @State private var sessionTabs: [SessionTab] = []
     @State private var activeTabID: UUID? = nil
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var connectionNeedingPassword: SSHConnection? = nil
 
     private var activeTab: SessionTab? {
         if let id = activeTabID {
@@ -77,7 +79,7 @@ struct ContentView: View {
 
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             List(selection: $selection) {
                 // Open Sessions / Tabs (Multi-Server Tabs)
                 if !sessionTabs.isEmpty {
@@ -232,7 +234,7 @@ struct ContentView: View {
             .navigationSplitViewColumnWidth(min: 200, ideal: 230, max: 280)
         } detail: {
             detailView()
-                .frame(minWidth: 480)
+                .frame(minWidth: 480, maxWidth: .infinity, minHeight: 320, maxHeight: .infinity)
                 .searchable(text: $searchText, placement: .toolbar, prompt: "Search")
                 .toolbar {
                     mainToolbarItems()
@@ -249,6 +251,28 @@ struct ContentView: View {
         }
         .sheet(item: $connectionToEdit) { connection in
             ConnectionEditorView(connectionToEdit: connection)
+        }
+        .sheet(item: $connectionNeedingPassword) { connection in
+            PasswordPromptView(
+                connection: connection,
+                onConnect: { password, remember in
+                    if remember {
+                        connection.password = password
+                        try? modelContext.save()
+                    }
+                    connectionNeedingPassword = nil
+                    if let tab = sessionTabs.first(where: { $0.connection.id == connection.id }) {
+                        Task {
+                            await tab.service.connect(to: connection, sessionPassword: password)
+                        }
+                    } else {
+                        connectToBookmark(connection, sessionPassword: password)
+                    }
+                },
+                onCancel: {
+                    connectionNeedingPassword = nil
+                }
+            )
         }
         .sheet(isPresented: $showingImportSheet) {
             ImportConnectionsView(initialGroupName: targetGroupForImport) { imported in
@@ -523,7 +547,9 @@ struct ContentView: View {
             )
 
             connectedBrowserView(tab: tab)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder
@@ -537,7 +563,7 @@ struct ContentView: View {
                     isActive: tab.activePane == .local,
                     onActivate: { tab.activePane = .local }
                 )
-                .frame(minWidth: 320)
+                .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
 
                 RemoteFileBrowserView(
                     connection: tab.connection,
@@ -547,10 +573,17 @@ struct ContentView: View {
                     groupBy: groupBy,
                     localManager: tab.localManager,
                     isActive: tab.activePane == .remote,
-                    onActivate: { tab.activePane = .remote }
+                    onActivate: { tab.activePane = .remote },
+                    onPromptPassword: { conn in
+                        connectionNeedingPassword = conn
+                    },
+                    onEditConnection: { conn in
+                        connectionToEdit = conn
+                    }
                 )
-                .frame(minWidth: 320)
+                .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onKeyPress(.tab) {
                 tab.activePane = (tab.activePane == .local) ? .remote : .local
                 return .handled
@@ -564,8 +597,15 @@ struct ContentView: View {
                 groupBy: groupBy,
                 localManager: tab.localManager,
                 isActive: true,
-                onActivate: nil
+                onActivate: nil,
+                onPromptPassword: { conn in
+                    connectionNeedingPassword = conn
+                },
+                onEditConnection: { conn in
+                    connectionToEdit = conn
+                }
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -705,14 +745,20 @@ struct ContentView: View {
         )
     }
 
-    private func connectToBookmark(_ conn: SSHConnection) {
+    private func connectToBookmark(_ conn: SSHConnection, sessionPassword: String? = nil) {
+        let effectivePassword = sessionPassword ?? conn.password
+        if conn.authType == .password && effectivePassword.isEmpty {
+            connectionNeedingPassword = conn
+            return
+        }
+
         // If connection is already open in a tab, switch directly to that tab!
         if let existing = sessionTabs.first(where: { $0.connection.id == conn.id }) {
             activeTabID = existing.id
             selection = .tab(existing.id)
             if existing.service.state != .connected {
                 Task {
-                    await existing.service.connect(to: conn)
+                    await existing.service.connect(to: conn, sessionPassword: effectivePassword)
                 }
             }
             return
@@ -725,7 +771,7 @@ struct ContentView: View {
         selection = .tab(newTab.id)
 
         Task {
-            await newTab.service.connect(to: conn)
+            await newTab.service.connect(to: conn, sessionPassword: effectivePassword)
         }
     }
 

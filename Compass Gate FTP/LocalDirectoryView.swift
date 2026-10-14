@@ -561,6 +561,7 @@ struct LocalFileBrowserView: View {
                 }
             }
             .focused($isTableFocused)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .textBackgroundColor))
             .contextMenu(forSelectionType: String.self) { selectedIDs in
                 if let firstID = selectedIDs.first, let file = localManager.files.first(where: { $0.id == firstID }) {
@@ -704,6 +705,7 @@ struct LocalFileBrowserView: View {
                 QuickLookCoordinator.shared.updatePreview(url: newFile.url)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder

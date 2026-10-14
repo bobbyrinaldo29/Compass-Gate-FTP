@@ -152,6 +152,7 @@ final class SFTPService {
     var errorAlertTitle: String = "Connection Failed"
     var showErrorAlert: Bool = false
     var canReconnect: Bool { activeConnection != nil }
+    var currentSessionPassword: String? = nil
     var showingNewFolderDialog: Bool = false
     var newFolderName: String = ""
     var selectedFileID: String? = nil
@@ -1054,8 +1055,13 @@ final class SFTPService {
     private var sftpClient: SFTPClient?
     #endif
 
-    func connect(to connection: SSHConnection, initialPath: String? = nil) async {
+    func connect(to connection: SSHConnection, initialPath: String? = nil, sessionPassword: String? = nil) async {
         self.activeConnection = connection
+        if let pwd = sessionPassword, !pwd.isEmpty {
+            self.currentSessionPassword = pwd
+        }
+        let effectivePassword = (currentSessionPassword?.isEmpty == false) ? (currentSessionPassword ?? "") : connection.password
+
         await MainActor.run {
             self.state = .connecting
             self.statusMessage = "Connecting to \(connection.host):\(connection.port)..."
@@ -1066,8 +1072,8 @@ final class SFTPService {
         }
 
         // Validate credentials before attempting network connection
-        if connection.authType == .password && connection.password.isEmpty {
-            let msg = "Password is required for \(connection.username)@\(connection.host). Please enter your password in Quick Connect or Edit Connection."
+        if connection.authType == .password && effectivePassword.isEmpty {
+            let msg = "Password is required for \(connection.username)@\(connection.host). Please enter your password to connect."
             await MainActor.run {
                 self.state = .error(msg)
                 self.statusMessage = msg
@@ -1085,7 +1091,7 @@ final class SFTPService {
         do {
             let auth: SSHAuthenticationMethod
             if connection.authType == .password {
-                auth = .passwordBased(username: connection.username, password: connection.password)
+                auth = .passwordBased(username: connection.username, password: effectivePassword)
             } else {
                 let rawKey = connection.keyFilePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     ? "~/.ssh/id_rsa"
@@ -1227,11 +1233,20 @@ final class SFTPService {
         errorAlertTitle = "Connection Failed"
         showErrorAlert = false
         activeConnection = nil
+        currentSessionPassword = nil
         selectedFileID = nil
         fileToDelete = nil
         showingDeleteConfirmation = false
         renamingFileID = nil
         renameText = ""
+    }
+
+    func retryConnection(sessionPassword: String? = nil) {
+        guard let conn = activeConnection else { return }
+        let pwd = sessionPassword ?? currentSessionPassword
+        Task {
+            await connect(to: conn, initialPath: currentPath, sessionPassword: pwd)
+        }
     }
 
     func navigate(to item: RemoteFileItem) {

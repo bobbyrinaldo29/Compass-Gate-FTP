@@ -69,6 +69,7 @@ struct SessionTabBarView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay(alignment: .bottom) {
             Divider()
