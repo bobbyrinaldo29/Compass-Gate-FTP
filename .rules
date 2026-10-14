@@ -1,0 +1,10 @@
+# Rules
+
+Style menggunakan default dari Xcode:
+- Indentasi 4 spasi (Xcode default).
+- Naming: PascalCase untuk tipe/struct/class, camelCase untuk variabel/fungsi.
+- Typography / UI: Gunakan font sesuai dengan ukuran dan tipe bawaan dari Mac (macOS native Dynamic Type & SF Pro / SF Mono bawaan sistem, seperti .largeTitle, .title, .headline, .body, .subheadline, .caption).
+- Toolbar & Sidebar: Gunakan komponen native macOS (ToolbarItem, ToolbarItemGroup, .pickerStyle(.segmented), .searchable) dan JANGAN UBAH struktur desain toolbar & sidebar yang sudah disetujui.
+- SwiftUI: `@State private var` untuk state lokal, hindari force unwrapping (`!`).
+- Concurrency: Gunakan async/await modern Swift.
+- Unit Testing: Gunakan Swift Testing framework.
