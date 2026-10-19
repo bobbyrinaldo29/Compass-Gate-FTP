@@ -53,6 +53,7 @@ struct ContentView: View {
     @AppStorage("localCol_size") private var showLocalColSize = true
     @AppStorage("localCol_kind") private var showLocalColKind = true
     @AppStorage("localCol_dateModified") private var showLocalColDateModified = true
+    @AppStorage("hasSeededInitialBookmarks") private var hasSeededInitialBookmarks = false
 
     // SFTP State Manager
     @State private var sftpService = SFTPService()
@@ -793,7 +794,7 @@ struct ContentView: View {
 
     private func openTerminalForActiveRemote() {
         guard let tab = activeTab ?? sessionTabs.first(where: { $0.service.state == .connected }) else { return }
-        TerminalLauncher.openRemoteTerminal(connection: tab.connection, remotePath: tab.service.currentPath)
+        TerminalLauncher.openRemoteTerminal(connection: tab.connection, remotePath: tab.service.currentPath, sessionPassword: tab.service.currentSessionPassword)
     }
 
     private func openNewConnectionTab() {
@@ -871,9 +872,13 @@ struct ContentView: View {
             closeTab(tab)
         }
         modelContext.delete(connection)
+        try? modelContext.save()
     }
 
     private func seedSampleDataIfNeeded() {
+        guard !hasSeededInitialBookmarks else { return }
+        hasSeededInitialBookmarks = true
+
         if connections.isEmpty {
             let prod = SSHConnection(
                 name: "Production Server",
@@ -897,6 +902,7 @@ struct ContentView: View {
 
             modelContext.insert(prod)
             modelContext.insert(staging)
+            try? modelContext.save()
         }
     }
 }

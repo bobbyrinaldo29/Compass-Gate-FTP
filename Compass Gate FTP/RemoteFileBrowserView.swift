@@ -1370,7 +1370,7 @@ struct RemoteFileBrowserView: View {
                 sftpService.navigate(to: file)
             }
             Button {
-                TerminalLauncher.openRemoteTerminal(connection: connection, remotePath: file.path)
+                TerminalLauncher.openRemoteTerminal(connection: connection, remotePath: file.path, sessionPassword: sftpService.currentSessionPassword)
             } label: {
                 Label("Open in Terminal", systemImage: "terminal")
             }

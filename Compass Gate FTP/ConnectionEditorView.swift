@@ -171,5 +171,11 @@ struct ConnectionEditorView: View {
             )
             modelContext.insert(newConnection)
         }
+
+        do {
+            try modelContext.save()
+        } catch {
+            print("Failed to save connection to SwiftData: \(error)")
+        }
     }
 }

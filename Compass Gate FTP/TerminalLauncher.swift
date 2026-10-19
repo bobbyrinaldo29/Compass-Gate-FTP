@@ -10,13 +10,22 @@ import Foundation
 enum TerminalLauncher {
     /// Generates the self-deleting expect script that handles:
     /// - automated password entry (decoded securely from Base64)
+    /// - legacy host key compatibility (ssh-rsa, older kex algorithms)
+    /// - graceful EOF handling when SSH encounters errors
     /// - SIGWINCH window resize forwarding
     /// - automatic cd to remote directory after login
-    static func buildExpectScript(connection: SSHConnection, remotePath: String) -> String {
+    static func buildExpectScript(
+        connection: SSHConnection,
+        remotePath: String,
+        sessionPassword: String? = nil
+    ) -> String {
         let path = remotePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "/" : remotePath
 
         var sshArgs: [String] = [
-            "-o", "StrictHostKeyChecking=accept-new"
+            "-o", "StrictHostKeyChecking=accept-new",
+            "-o", "HostKeyAlgorithms=+ssh-rsa",
+            "-o", "PubkeyAcceptedAlgorithms=+ssh-rsa",
+            "-o", "KexAlgorithms=+diffie-hellman-group14-sha1,diffie-hellman-group1-sha1,diffie-hellman-group-exchange-sha1,diffie-hellman-group-exchange-sha256,diffie-hellman-group14-sha256"
         ]
         if connection.port != 22 && connection.port > 0 {
             sshArgs.append("-p \(connection.port)")
@@ -38,9 +47,10 @@ enum TerminalLauncher {
         let pathData = Data(path.utf8)
         let b64Path = pathData.base64EncodedString()
 
-        let passData = Data(connection.password.utf8)
+        let effectivePassword = (sessionPassword?.isEmpty == false) ? (sessionPassword ?? "") : connection.password
+        let passData = Data(effectivePassword.utf8)
         let b64Pass = passData.base64EncodedString()
-        let hasPassword = connection.authType == .password && !connection.password.isEmpty
+        let hasPassword = connection.authType == .password && !effectivePassword.isEmpty
 
         let passwordBlock = hasPassword ? """
         set pass [exec echo "\(b64Pass)" | base64 --decode]
@@ -71,6 +81,10 @@ enum TerminalLauncher {
         spawn \(spawnCmd)
 
         expect {
+            eof {
+                catch { wait }
+                exit 1
+            }
             -re {(?i)are you sure you want to continue} {
                 send "yes\\r"
                 exp_continue
@@ -80,6 +94,10 @@ enum TerminalLauncher {
         }
 
         expect {
+            eof {
+                catch { wait }
+                exit 1
+            }
             -re {[#$%>~]\\s*$} {
                 send "cd \\"$remotePath\\"\\r"
             }
@@ -88,22 +106,31 @@ enum TerminalLauncher {
             }
         }
 
-        interact
+        catch { interact }
         """
     }
 
     /// Launches the terminal application (iTerm2 if running/available, or macOS Terminal.app)
     /// connects to the SSH server, automatically enters the password if needed,
     /// and navigates directly into the target remote folder without triggering macOS security prompts.
-    static func openRemoteTerminal(connection: SSHConnection, remotePath: String) {
+    static func openRemoteTerminal(
+        connection: SSHConnection,
+        remotePath: String,
+        sessionPassword: String? = nil
+    ) {
+        let effectivePassword = (sessionPassword?.isEmpty == false) ? (sessionPassword ?? "") : connection.password
         // Also keep clipboard ready as fallback
-        if connection.authType == .password && !connection.password.isEmpty {
+        if connection.authType == .password && !effectivePassword.isEmpty {
             let pb = NSPasteboard.general
             pb.clearContents()
-            pb.setString(connection.password, forType: .string)
+            pb.setString(effectivePassword, forType: .string)
         }
 
-        let scriptContent = buildExpectScript(connection: connection, remotePath: remotePath)
+        let scriptContent = buildExpectScript(
+            connection: connection,
+            remotePath: remotePath,
+            sessionPassword: effectivePassword
+        )
         let tempScript = FileManager.default.temporaryDirectory
             .appendingPathComponent("compass_gate_ssh_\(UUID().uuidString.prefix(8)).exp")
 

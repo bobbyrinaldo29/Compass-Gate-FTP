@@ -95,22 +95,45 @@ struct Compass_Gate_FTPApp: App {
             SSHConnection.self,
             Item.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        let appDir = appSupport.appendingPathComponent("Compass Gate FTP", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: appDir.path) {
+            try? FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true)
+        }
+        
+        let storeURL = appDir.appendingPathComponent("compass_gate.store")
+        
+        // Migrate legacy default.store if needed
+        if !FileManager.default.fileExists(atPath: storeURL.path) {
+            let legacyStore = appSupport.appendingPathComponent("default.store")
+            if FileManager.default.fileExists(atPath: legacyStore.path) {
+                try? FileManager.default.copyItem(at: legacyStore, to: storeURL)
+                let legacyWal = legacyStore.appendingPathExtension("wal")
+                let legacyShm = legacyStore.appendingPathExtension("shm")
+                let newWal = storeURL.appendingPathExtension("wal")
+                let newShm = storeURL.appendingPathExtension("shm")
+                if FileManager.default.fileExists(atPath: legacyWal.path) {
+                    try? FileManager.default.copyItem(at: legacyWal, to: newWal)
+                }
+                if FileManager.default.fileExists(atPath: legacyShm.path) {
+                    try? FileManager.default.copyItem(at: legacyShm, to: newShm)
+                }
+            }
+        }
+        
+        let modelConfiguration = ModelConfiguration(schema: schema, url: storeURL)
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
         } catch {
-            // Fallback gracefully during development if schema changes without migration plan
-            if let storeURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?.appendingPathComponent("default.store") {
-                try? FileManager.default.removeItem(at: storeURL)
-                let shm = storeURL.appendingPathExtension("shm")
-                let wal = storeURL.appendingPathExtension("wal")
-                try? FileManager.default.removeItem(at: shm)
-                try? FileManager.default.removeItem(at: wal)
-            }
+            print("Warning: Failed to open primary ModelContainer: \(error)")
+            // Backup before attempting any recovery instead of outright deleting!
+            let backupURL = storeURL.appendingPathExtension("backup_\(Int(Date().timeIntervalSince1970))")
+            try? FileManager.default.copyItem(at: storeURL, to: backupURL)
 
             do {
-                return try ModelContainer(for: schema, configurations: [modelConfiguration])
+                return try ModelContainer(for: schema, configurations: [ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)])
             } catch {
                 fatalError("Could not create ModelContainer: \(error)")
             }
