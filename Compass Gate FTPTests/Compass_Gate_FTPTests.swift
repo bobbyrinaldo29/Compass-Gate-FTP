@@ -7,6 +7,7 @@
 
 import Testing
 import Foundation
+import SwiftUI
 @testable import Compass_Gate_FTP
 
 @MainActor
@@ -376,6 +377,25 @@ Filesystem      Size  Used Avail Use% Mounted on
         let resRefused = service.friendlyErrorMessage(for: connRefused)
         #expect(resRefused.title == "Connection Refused")
         #expect(resRefused.message.contains("port number"))
+    }
+
+    @Test func testDualPaneSplitViewClampAndPersistence() {
+        var width: Double = 420.0
+        let binding = Binding<Double>(
+            get: { width },
+            set: { width = $0 }
+        )
+        let split = DualPaneSplitView(
+            leftWidth: binding,
+            minLeftWidth: 280,
+            minRightWidth: 300,
+            left: { Text("Left") },
+            right: { Text("Right") }
+        )
+        #expect(split.minLeftWidth == 280)
+        #expect(split.minRightWidth == 300)
+        binding.wrappedValue = 520.0
+        #expect(width == 520.0)
     }
 
     @Test func testEmptyPasswordValidationAndSessionPassword() async {

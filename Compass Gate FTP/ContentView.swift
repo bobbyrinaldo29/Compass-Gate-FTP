@@ -54,6 +54,7 @@ struct ContentView: View {
     @AppStorage("localCol_kind") private var showLocalColKind = true
     @AppStorage("localCol_dateModified") private var showLocalColDateModified = true
     @AppStorage("hasSeededInitialBookmarks") private var hasSeededInitialBookmarks = false
+    @AppStorage("dualPaneLocalWidth") private var dualPaneLocalWidth: Double = 420.0
 
     // SFTP State Manager
     @State private var sftpService = SFTPService()
@@ -556,7 +557,11 @@ struct ContentView: View {
     @ViewBuilder
     private func connectedBrowserView(tab: SessionTab) -> some View {
         if showDualPane {
-            HSplitView {
+            DualPaneSplitView(
+                leftWidth: $dualPaneLocalWidth,
+                minLeftWidth: 280,
+                minRightWidth: 300
+            ) {
                 LocalFileBrowserView(
                     localManager: tab.localManager,
                     sftpService: tab.service,
@@ -564,8 +569,7 @@ struct ContentView: View {
                     isActive: tab.activePane == .local,
                     onActivate: { tab.activePane = .local }
                 )
-                .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
-
+            } right: {
                 RemoteFileBrowserView(
                     connection: tab.connection,
                     sftpService: tab.service,
@@ -582,7 +586,6 @@ struct ContentView: View {
                         connectionToEdit = conn
                     }
                 )
-                .frame(minWidth: 320, maxWidth: .infinity, maxHeight: .infinity)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .onKeyPress(.tab) {
